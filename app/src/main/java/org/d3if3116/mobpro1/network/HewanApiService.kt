@@ -32,4 +32,4 @@ object HewanApi {
         return "$BASE_URL$imageId.jpg"
     }
 }
-enum class ApiStatus { LOADING, SUCCES}
+enum class ApiStatus { LOADING, SUCCES, FAILED}

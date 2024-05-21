@@ -19,7 +19,7 @@ class MainViewModel:ViewModel()  {
     init {
         retrieveData()
     }
-    private fun retrieveData() {
+    fun retrieveData() {
         viewModelScope.launch(Dispatchers.IO) {
             status.value = org.d3if3116.mobpro1.network.ApiStatus.LOADING
             try {
@@ -27,6 +27,7 @@ class MainViewModel:ViewModel()  {
                 status.value = org.d3if3116.mobpro1.network.ApiStatus.SUCCES
             } catch (e: Exception) {
                 Log.d("MainViewModel", "Failure: ${e.message}")
+                status.value = org.d3if3116.mobpro1.network.ApiStatus.FAILED
             }
         }
     }
