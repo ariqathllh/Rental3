@@ -235,6 +235,14 @@ fun MainScreen () {
         }
     ) { padding ->
         ScreenContent(Modifier.padding(padding))
+        if (showDialog) {
+            ProfilDialog(
+                user = user,
+                onDismissRequest = { showDialog = false }) {
+//                CoroutineScope(Dispatchers.IO).launch { signOut(context, dataStore) }
+                showDialog = false
+            }
+        }
     }
 }
 
