@@ -43,10 +43,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.datastore.dataStore
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -197,6 +199,18 @@ private suspend fun handleSignIn(result: GetCredentialResponse, dataStore: UserD
         Log.e("SIGN-IN", "Error: unrecognized custom credential type.")
     }
 }
+
+private suspend fun signOut(context: Context, dataStore: UserDataStore) {
+    try {
+        val credentialManager = CredentialManager.create(context)
+        credentialManager.clearCredentialState(
+            ClearCredentialStateRequest()
+        )
+        dataStore.saveData(User())
+    } catch (e: ClearCredentialException) {
+        Log.e("SIGN-IN", "Error: ${e.errorMessage}")
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen () {
@@ -239,7 +253,7 @@ fun MainScreen () {
             ProfilDialog(
                 user = user,
                 onDismissRequest = { showDialog = false }) {
-//                CoroutineScope(Dispatchers.IO).launch { signOut(context, dataStore) }
+                CoroutineScope(Dispatchers.IO).launch { signOut(context, dataStore) }
                 showDialog = false
             }
         }
