@@ -7,8 +7,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 
-private const val BASE_URL =
-    "https://raw.githubusercontent.com/indraazimi/mobpro1-compose/static-api/"
+private const val BASE_URL = "https://gh.d3ifcool.org/"
 
 private val moshi = Moshi.Builder()
     .add(KotlinJsonAdapterFactory())
@@ -20,7 +19,7 @@ private val retrofit = Retrofit.Builder()
     .build()
 
 interface HewanApiService {
-    @GET("static-api.json")
+    @GET("hewan.php")
     suspend fun getHewan(): List<Hewan>
 }
 
@@ -29,7 +28,7 @@ object HewanApi {
         retrofit.create(HewanApiService::class.java)
     }
     fun getHewanUrl(imageId: String): String {
-        return "$BASE_URL$imageId.jpg"
+        return "${BASE_URL}image.php?id=$imageId"
     }
 }
 enum class ApiStatus { LOADING, SUCCES, FAILED}
