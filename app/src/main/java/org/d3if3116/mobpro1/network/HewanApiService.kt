@@ -8,11 +8,13 @@ import org.d3if3116.mobpro1.model.Hewan
 import org.d3if3116.mobpro1.model.OpStatus
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
+import retrofit2.http.Query
 
 private const val BASE_URL = "https://gh.d3ifcool.org/"
 
@@ -39,6 +41,12 @@ interface HewanApiService {
         @Part("namaLatin") namaLatin: RequestBody,
         @Part image: MultipartBody.Part
     ): OpStatus
+
+    @DELETE("hewan.php")
+    suspend fun deleteHewan(
+        @Header("Authorization") userId: String,
+        @Query("id") id: String
+    ): OpStatus
 }
 
 object HewanApi {
@@ -49,4 +57,4 @@ object HewanApi {
         return "${BASE_URL}image.php?id=$imageId"
     }
 }
-enum class ApiStatus { LOADING, SUCCES, FAILED}
+enum class ApiStatus { LOADING, SUCCESS, FAILED}

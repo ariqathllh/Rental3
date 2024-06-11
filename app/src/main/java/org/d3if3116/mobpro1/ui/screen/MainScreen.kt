@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -80,12 +82,134 @@ import org.d3if3116.mobpro1.BuildConfig
 import org.d3if3116.mobpro1.R
 import org.d3if3116.mobpro1.model.Hewan
 import org.d3if3116.mobpro1.model.User
+import org.d3if3116.mobpro1.network.ApiStatus
 import org.d3if3116.mobpro1.network.HewanApi
 import org.d3if3116.mobpro1.network.UserDataStore
 import org.d3if3116.mobpro1.ui.theme.Mobpro1Theme
-@Composable
-fun ScreenContent(viewModel: MainViewModel, userId: String, modifier: Modifier) {
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen() {
+    val context = LocalContext.current
+    val dataStore = UserDataStore(context)
+    val user by dataStore.userFlow.collectAsState(User())
+
+    val viewModel: MainViewModel = viewModel()
+    val errorMessage by viewModel.errorMessage
+
+    var showDialog by remember { mutableStateOf(false) }
+    var showHewanDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var currentHewanId by remember { mutableStateOf("") }
+
+    var bitmap: Bitmap? by remember { mutableStateOf(null) }
+    val launcher = rememberLauncherForActivityResult(CropImageContract()) {
+        bitmap = getCroppedImage(context.contentResolver, it)
+        if (bitmap != null) showHewanDialog = true
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(text = stringResource(id = R.string.app_name))
+                },
+                colors = TopAppBarDefaults.mediumTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                ),
+                actions = {
+                    IconButton(onClick = {
+                        if (user.email.isEmpty()) {
+                            CoroutineScope(Dispatchers.IO).launch { signIn(context, dataStore) }
+                        } else {
+                            showDialog = true
+                        }
+                    }) {
+                        Icon(
+                            painter = painterResource(R.drawable.baseline_account_circle_24),
+                            contentDescription = stringResource(R.string.profil),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            if (user.email.isNotEmpty()) {
+                FloatingActionButton(onClick = {
+                    val options = CropImageContractOptions(
+                        null, CropImageOptions(
+                            imageSourceIncludeGallery = false,
+                            imageSourceIncludeCamera = true,
+                            fixAspectRatio = true
+                        )
+                    )
+                    launcher.launch(options)
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(id = R.string.tambah_hewan)
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        ScreenContent(
+            viewModel = viewModel,
+            userId = user.email,
+            modifier = Modifier.padding(padding),
+            onDeleteRequest = { id ->
+                showDeleteDialog = true
+                currentHewanId = id
+                Log.d("MainScreen", "Current Hewan ID: $currentHewanId")
+            },
+            isUserLoggedIn = user.email.isNotEmpty()
+        )
+
+        if (showDialog) {
+            ProfilDialog(
+                user = user,
+                onDismissRequest = { showDialog = false }) {
+                CoroutineScope(Dispatchers.IO).launch { signOut(context, dataStore) }
+                showDialog = false
+            }
+        }
+        if (showHewanDialog) {
+            HewanDialog(
+                bitmap = bitmap,
+                onDismissRequest = { showHewanDialog = false }) { nama, namaLatin ->
+                viewModel.saveData(user.email, nama, namaLatin, bitmap!!)
+                showHewanDialog = false
+            }
+        }
+
+        if (errorMessage != null) {
+            Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+            viewModel.clearMessage()
+        }
+
+        if (showDeleteDialog) {
+            DeleteConfirmationDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                onConfirm = {
+                    Log.d("MainScreen", "Deleting Hewan ID: $currentHewanId")
+                    viewModel.deleteData(user.email, currentHewanId)
+                    showDeleteDialog = false
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun ScreenContent(
+    viewModel: MainViewModel,
+    userId: String,
+    modifier: Modifier,
+    onDeleteRequest: (String) -> Unit,
+    isUserLoggedIn: Boolean
+) {
     val data by viewModel.data
     val status by viewModel.status.collectAsState()
 
@@ -94,17 +218,16 @@ fun ScreenContent(viewModel: MainViewModel, userId: String, modifier: Modifier) 
     }
 
     when (status) {
-        org.d3if3116.mobpro1.network.ApiStatus.LOADING -> {
+        ApiStatus.LOADING -> {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
             }
-
         }
 
-        org.d3if3116.mobpro1.network.ApiStatus.SUCCES -> {
+        ApiStatus.SUCCESS -> {
             LazyVerticalGrid(
                 modifier = modifier
                     .fillMaxSize()
@@ -112,12 +235,17 @@ fun ScreenContent(viewModel: MainViewModel, userId: String, modifier: Modifier) 
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
-                items(data) { ListItem(hewan = it) }
+                items(data) { hewan ->
+                    ListItem(
+                        hewan = hewan,
+                        onDeleteRequest = onDeleteRequest,
+                        isUserLoggedIn = isUserLoggedIn
+                    )
+                }
             }
-
-
         }
-        org.d3if3116.mobpro1.network.ApiStatus.FAILED -> {
+
+        ApiStatus.FAILED -> {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
@@ -125,19 +253,19 @@ fun ScreenContent(viewModel: MainViewModel, userId: String, modifier: Modifier) 
             ) {
                 Text(text = stringResource(id = R.string.error))
                 Button(
-                    onClick = {viewModel.retrieveData(userId)},
+                    onClick = { viewModel.retrieveData(userId) },
                     modifier = Modifier.padding(top = 16.dp),
                     contentPadding = PaddingValues(horizontal = 32.dp, vertical = 16.dp)
-                    ) {
+                ) {
                     Text(text = stringResource(id = R.string.try_again))
-
                 }
             }
         }
     }
 }
+
 @Composable
-fun ListItem(hewan: Hewan) {
+fun ListItem(hewan: Hewan, onDeleteRequest: (String) -> Unit, isUserLoggedIn: Boolean) {
     Box(
         modifier = Modifier
             .padding(4.dp)
@@ -146,11 +274,7 @@ fun ListItem(hewan: Hewan) {
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(
-                    if (hewan.nama == "Ayam")
-                        HewanApi.getHewanUrl("not-found")
-                    else
-                        HewanApi.getHewanUrl(hewan.imageId))
+                .data(HewanApi.getHewanUrl(hewan.imageId))
                 .crossfade(true)
                 .build(),
             contentDescription = stringResource(R.string.gambar, hewan.nama),
@@ -161,24 +285,44 @@ fun ListItem(hewan: Hewan) {
                 .fillMaxWidth()
                 .padding(4.dp)
         )
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(4.dp)
                 .background(Color(red = 0f, green = 0f, blue = 0f, alpha = 0.5f))
                 .padding(4.dp)
         ) {
-            Text(
-                text = hewan.nama,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Text(
-                text = hewan.namaLatin,
-                fontStyle = FontStyle.Italic,
-                fontSize = 14.sp,
-                color = Color.White
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = hewan.nama,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = hewan.namaLatin,
+                    fontStyle = FontStyle.Italic,
+                    fontSize = 14.sp,
+                    color = Color.White
+                )
+            }
+            if (isUserLoggedIn && hewan.mine == 1) {
+                IconButton(
+                    onClick = {
+                        if (hewan.id.isNotEmpty()) {
+                            onDeleteRequest(hewan.id)
+                        } else {
+                            Log.d("ListItem", "Invalid hewan ID")
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.CenterVertically)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.hapus),
+                        tint = Color.White
+                    )
+                }
+            }
         }
     }
 }
@@ -241,6 +385,7 @@ private fun getCroppedImage(
         Log.e("IMAGE", "Error: ${result.error}")
         return null
     }
+
     val uri = result.uriContent ?: return null
 
     return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
@@ -248,94 +393,6 @@ private fun getCroppedImage(
     } else {
         val source = ImageDecoder.createSource(resolver, uri)
         ImageDecoder.decodeBitmap(source)
-    }
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainScreen () {
-    val context = LocalContext.current
-    val dataStore = UserDataStore(context)
-    val user by dataStore.userFlow.collectAsState(User())
-
-    val viewModel: MainViewModel = viewModel()
-    val errorMessage by viewModel.errorMessage
-
-    var showDialog by remember { mutableStateOf(false) }
-    var showHewanDialog by remember { mutableStateOf(false) }
-    var bitmap: Bitmap? by remember { mutableStateOf(null) }
-    val launcher = rememberLauncherForActivityResult(CropImageContract()) {
-        bitmap = getCroppedImage(context.contentResolver, it)
-        if (bitmap != null) showHewanDialog = true
-    }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title =  {
-                    Text(text = stringResource(id = R.string.app_name))
-                },
-                colors = TopAppBarDefaults.mediumTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.primary,
-                ),
-                actions = {
-                    IconButton(onClick = {
-                        if (user.email.isEmpty()) {
-                            CoroutineScope(Dispatchers.IO).launch { signIn(context, dataStore) }
-                        }
-                        else {
-                            showDialog = true
-                        }
-                    }) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.baseline_account_circle_24),
-                            contentDescription = stringResource(id = R.string.profil),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = {
-                val options = CropImageContractOptions(
-                    null, CropImageOptions(
-                        imageSourceIncludeGallery = false,
-                        imageSourceIncludeCamera = true,
-                        fixAspectRatio = true
-                    )
-                )
-                launcher.launch(options)
-            }) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(id = R.string.tambah_hewan)
-                )
-            }
-        }
-    ) { padding ->
-        ScreenContent(viewModel, user.email, Modifier.padding(padding))
-        if (showDialog) {
-            ProfilDialog(
-                user = user,
-                onDismissRequest = { showDialog = false }) {
-                CoroutineScope(Dispatchers.IO).launch { signOut(context, dataStore) }
-                showDialog = false
-            }
-        }
-        if (showHewanDialog) {
-            HewanDialog(
-                bitmap = bitmap,
-                onDismissRequest = { showHewanDialog = false }) { nama, namaLatin ->
-                viewModel.saveData(user.email, nama, namaLatin, bitmap!!)
-                showHewanDialog = false
-            }
-        }
-
-        if (errorMessage != null) {
-            Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
-            viewModel.clearMessage()
-        }
-
     }
 }
 
