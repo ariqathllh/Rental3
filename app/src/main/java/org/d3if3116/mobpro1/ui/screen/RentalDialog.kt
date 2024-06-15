@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,13 +34,15 @@ import org.d3if3116.mobpro1.R
 import org.d3if3116.mobpro1.ui.theme.Mobpro1Theme
 
 @Composable
-fun HewanDialog(
+fun RentalDialog(
     bitmap: Bitmap?,
     onDismissRequest: () -> Unit,
-    onConfirmation: (String, String) -> Unit
+    onConfirmation: (String, String, String) -> Unit
 ) {
-    var nama by remember { mutableStateOf("") }
-    var namaLatin by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var vehicle by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("") }
+    val options = listOf("Man", "Woman")
 
     Dialog(onDismissRequest = { onDismissRequest() }) {
         Card(
@@ -53,12 +56,14 @@ fun HewanDialog(
                 Image(
                     bitmap = bitmap!!.asImageBitmap(),
                     contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
                 )
                 OutlinedTextField(
-                    value = nama,
-                    onValueChange = { nama = it },
-                    label = { Text(text = stringResource(id = R.string.nama)) },
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(text = stringResource(id = R.string.name)) },
                     maxLines = 1,
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Words,
@@ -67,18 +72,40 @@ fun HewanDialog(
                     modifier = Modifier.padding(top = 8.dp)
                 )
                 OutlinedTextField(
-                    value = namaLatin,
-                    onValueChange = { namaLatin = it },
-                    label = { Text(text = stringResource(id = R.string.nama_latin)) },
+                    value = vehicle,
+                    onValueChange = { vehicle = it },
+                    label = { Text(text = stringResource(id = R.string.vehicle)) },
                     maxLines = 1,
                     keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                        imeAction = ImeAction.Done
+                        capitalization = KeyboardCapitalization.Words,
+                        imeAction = ImeAction.Next
                     ),
                     modifier = Modifier.padding(top = 8.dp)
                 )
+                Column(modifier = Modifier
+                    .padding(top = 8.dp)
+                    .fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(text = stringResource(id = R.string.select))
+                    options.forEach { option ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 0.dp)
+                        ) {
+                            RadioButton(
+                                selected = gender == option,
+                                onClick = { gender = option }
+                            )
+                            Text(text = option, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
+
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
                     horizontalArrangement = Arrangement.Center
                 ) {
                     OutlinedButton(
@@ -88,8 +115,8 @@ fun HewanDialog(
                         Text(text = stringResource(R.string.batal))
                     }
                     OutlinedButton(
-                        onClick = { onConfirmation(nama, namaLatin) },
-                        enabled = nama.isNotEmpty() && namaLatin.isNotEmpty(),
+                        onClick = { onConfirmation(name, vehicle, gender) },
+                        enabled = name.isNotEmpty() && vehicle.isNotEmpty() && gender.isNotEmpty(),
                         modifier = Modifier.padding(8.dp)
                     ) {
                         Text(text = stringResource(R.string.simpan))
@@ -105,10 +132,9 @@ fun HewanDialog(
 @Composable
 fun AddDialogPreview() {
     Mobpro1Theme {
-        HewanDialog(
+        RentalDialog(
             bitmap = null,
-            onDismissRequest = {},
-            onConfirmation = { _, _-> }
-        )
+            onDismissRequest = {}
+        ) { _, _, _ -> }
     }
 }

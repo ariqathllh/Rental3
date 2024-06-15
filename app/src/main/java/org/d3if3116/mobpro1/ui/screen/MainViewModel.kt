@@ -5,9 +5,9 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import org.d3if3116.mobpro1.model.Hewan
+import org.d3if3116.mobpro1.model.Rental
 import org.d3if3116.mobpro1.network.ApiStatus
-import org.d3if3116.mobpro1.network.HewanApi
+import org.d3if3116.mobpro1.network.RentalApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -18,7 +18,7 @@ import java.io.ByteArrayOutputStream
 
 class MainViewModel : ViewModel() {
 
-    var data = mutableStateOf(emptyList<Hewan>())
+    var data = mutableStateOf(emptyList<Rental>())
         private set
 
     var status = MutableStateFlow(ApiStatus.LOADING)
@@ -31,7 +31,7 @@ class MainViewModel : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             status.value = ApiStatus.LOADING
             try {
-                data.value = HewanApi.service.getHewan(userId)
+                data.value = RentalApi.service.getRental(userId)
                 status.value = ApiStatus.SUCCESS
             } catch (e: Exception) {
                 Log.d("MainViewModel", "Failure: ${e.message}")
@@ -40,13 +40,14 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun saveData(userId: String, nama: String, namaLatin: String, bitmap: Bitmap) {
+    fun saveData(userId: String, name: String, vehicle: String, gender: String, bitmap: Bitmap) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val result = HewanApi.service.postHewan(
+                val result = RentalApi.service.postRental(
                     userId,
-                    nama.toRequestBody("text/plain".toMediaTypeOrNull()),
-                    namaLatin.toRequestBody("text/plain".toMediaTypeOrNull()),
+                    name.toRequestBody("text/plain".toMediaTypeOrNull()),
+                    vehicle.toRequestBody("text/plain".toMediaTypeOrNull()),
+                    gender.toRequestBody("text/plain".toMediaTypeOrNull()),
                     bitmap.toMultipartBody()
                 )
 
@@ -61,11 +62,11 @@ class MainViewModel : ViewModel() {
         }
     }
 
-    fun deleteData(userId: String, hewanId: String) {
+    fun deleteData(userId: String, rentalId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                Log.d("MainViewModel", "Attempting to delete hewan with ID: $hewanId using user ID: $userId")
-                val result = HewanApi.service.deleteHewan(userId, hewanId)
+                Log.d("MainViewModel", "Attempting to delete rental with ID: $rentalId using user ID: $userId")
+                val result = RentalApi.service.deleteRental(userId, rentalId)
                 Log.d("MainViewModel", "API Response: status=${result.status}, message=${result.message}")
                 if (result.status == "success") {
                     retrieveData(userId)

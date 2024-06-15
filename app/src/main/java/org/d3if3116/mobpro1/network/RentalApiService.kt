@@ -4,7 +4,7 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
-import org.d3if3116.mobpro1.model.Hewan
+import org.d3if3116.mobpro1.model.Rental
 import org.d3if3116.mobpro1.model.OpStatus
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -16,7 +16,7 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Query
 
-private const val BASE_URL = "https://gh.d3ifcool.org/"
+private const val BASE_URL = "https://ariqathllh.my.id/other/api/"
 
 private val moshi = Moshi.Builder()
     .add(KotlinJsonAdapterFactory())
@@ -27,34 +27,35 @@ private val retrofit = Retrofit.Builder()
     .baseUrl(BASE_URL)
     .build()
 
-interface HewanApiService {
-    @GET("hewan.php")
-    suspend fun getHewan(
-        @Header("Authorization") userId: String
-    ): List<Hewan>
+interface RentalApiService {
+    @GET("json.php")
+    suspend fun getRental(
+        @Query("auth") userId: String
+    ): List<Rental>
 
     @Multipart
-    @POST("hewan.php")
-    suspend fun postHewan(
-        @Header("Authorization") userId: String,
-        @Part("nama") nama: RequestBody,
-        @Part("namaLatin") namaLatin: RequestBody,
+    @POST("json.php")
+    suspend fun postRental(
+        @Part("auth") userId: String,
+        @Part("name") name: RequestBody,
+        @Part("vehicle") vehicle: RequestBody,
+        @Part("gender") gender: RequestBody,
         @Part image: MultipartBody.Part
     ): OpStatus
 
-    @DELETE("hewan.php")
-    suspend fun deleteHewan(
-        @Header("Authorization") userId: String,
+    @DELETE("json.php")
+    suspend fun deleteRental(
+        @Query("auth") userId: String,
         @Query("id") id: String
     ): OpStatus
 }
 
-object HewanApi {
-    val service: HewanApiService by lazy {
-        retrofit.create(HewanApiService::class.java)
+object RentalApi {
+    val service: RentalApiService by lazy {
+        retrofit.create(RentalApiService::class.java)
     }
-    fun getHewanUrl(imageId: String): String {
-        return "${BASE_URL}image.php?id=$imageId"
+    fun getRentalUrl(gambar: String): String {
+        return "${BASE_URL}$gambar"
     }
 }
 enum class ApiStatus { LOADING, SUCCESS, FAILED}

@@ -98,16 +98,3 @@ fun ProfilDialog(
     }
 }
 
-@Preview(showBackground = true)
-@Preview(uiMode = Configuration.UI_MODE_NIGHT_YES, showBackground = true)
-@Composable
-fun DialogPreview() {
-    Mobpro1Theme {
-        ProfilDialog(
-            user = User("Ariq Athallah", "ariqathllh12@gmail.com", ""),
-            onDismissRequest = {},
-            onConfirmation = {}
-        )
-    }
-}
-

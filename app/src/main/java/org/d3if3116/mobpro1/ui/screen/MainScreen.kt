@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -17,15 +18,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -54,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.credentials.ClearCredentialStateRequest
@@ -63,11 +72,12 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.ClearCredentialException
 import androidx.credentials.exceptions.GetCredentialException
-import androidx.datastore.dataStore
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import coil.compose.rememberImagePainter
 import coil.request.ImageRequest
-import com.canhub.cropper.CropImage
 import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
@@ -80,16 +90,45 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.d3if3116.mobpro1.BuildConfig
 import org.d3if3116.mobpro1.R
-import org.d3if3116.mobpro1.model.Hewan
+import org.d3if3116.mobpro1.model.Rental
 import org.d3if3116.mobpro1.model.User
+import org.d3if3116.mobpro1.navigation.Screen
 import org.d3if3116.mobpro1.network.ApiStatus
-import org.d3if3116.mobpro1.network.HewanApi
+import org.d3if3116.mobpro1.network.RentalApi
 import org.d3if3116.mobpro1.network.UserDataStore
 import org.d3if3116.mobpro1.ui.theme.Mobpro1Theme
 
+@Composable
+fun ProfileImage(
+    imageUrl: String?,
+    modifier: Modifier = Modifier,
+    contentDescription: String?,
+    defaultImageRes: Int,
+    imageSize: Dp = 48.dp
+) {
+    val painter = rememberImagePainter(
+        data = imageUrl,
+        builder = {
+            crossfade(true)
+            placeholder(defaultImageRes)
+        }
+    )
+
+    Box(
+        modifier = modifier
+            .size(imageSize)
+            .clip(shape = CircleShape)
+    ) {
+        Image(
+            painter = painter,
+            contentDescription = contentDescription,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(navController: NavHostController) {
     val context = LocalContext.current
     val dataStore = UserDataStore(context)
     val user by dataStore.userFlow.collectAsState(User())
@@ -98,15 +137,17 @@ fun MainScreen() {
     val errorMessage by viewModel.errorMessage
 
     var showDialog by remember { mutableStateOf(false) }
-    var showHewanDialog by remember { mutableStateOf(false) }
+    var showRentalDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var currentHewanId by remember { mutableStateOf("") }
+    var currentRentalId by remember { mutableStateOf("") }
 
     var bitmap: Bitmap? by remember { mutableStateOf(null) }
     val launcher = rememberLauncherForActivityResult(CropImageContract()) {
         bitmap = getCroppedImage(context.contentResolver, it)
-        if (bitmap != null) showHewanDialog = true
+        if (bitmap != null) showRentalDialog = true
     }
+
+    var showList by remember { mutableStateOf(true) }
 
     Scaffold(
         topBar = {
@@ -120,15 +161,46 @@ fun MainScreen() {
                 ),
                 actions = {
                     IconButton(onClick = {
+                        showList = !showList
+                    }) {
+                        Icon(
+                            painter = painterResource(
+                                if (showList) R.drawable.view_grid
+                                else R.drawable.baseline_view_list_24
+                            ),
+                            contentDescription = stringResource(
+                                if (showList) R.string.grid
+                                else R.string.list
+                            ),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(onClick = {
                         if (user.email.isEmpty()) {
                             CoroutineScope(Dispatchers.IO).launch { signIn(context, dataStore) }
                         } else {
                             showDialog = true
                         }
                     }) {
+                        if (!user.photoUrl.isNullOrEmpty()) {
+                            ProfileImage(
+                                imageUrl = user.photoUrl,
+                                contentDescription = stringResource(R.string.profil),
+                                defaultImageRes = R.drawable.baseline_account_circle_24,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(R.drawable.baseline_account_circle_24),
+                                contentDescription = stringResource(R.string.profil),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    IconButton(onClick = { navController.navigate(Screen.About.route) }) {
                         Icon(
-                            painter = painterResource(R.drawable.baseline_account_circle_24),
-                            contentDescription = stringResource(R.string.profil),
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = stringResource(R.string.about),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -136,33 +208,39 @@ fun MainScreen() {
             )
         },
         floatingActionButton = {
-            if (user.email.isNotEmpty()) {
-                FloatingActionButton(onClick = {
-                    val options = CropImageContractOptions(
-                        null, CropImageOptions(
-                            imageSourceIncludeGallery = false,
-                            imageSourceIncludeCamera = true,
-                            fixAspectRatio = true
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (user.email.isNotEmpty()) {
+                    FloatingActionButton(onClick = {
+                        val options = CropImageContractOptions(
+                            null, CropImageOptions(
+                                imageSourceIncludeGallery = false,
+                                imageSourceIncludeCamera = true,
+                                fixAspectRatio = true
+                            )
                         )
-                    )
-                    launcher.launch(options)
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = stringResource(id = R.string.tambah_hewan)
-                    )
+                        launcher.launch(options)
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = stringResource(id = R.string.tambah_rental)
+                        )
+                    }
                 }
             }
         }
     ) { padding ->
         ScreenContent(
+            showList = showList,  // Ubah di sini
             viewModel = viewModel,
             userId = user.email,
             modifier = Modifier.padding(padding),
             onDeleteRequest = { id ->
                 showDeleteDialog = true
-                currentHewanId = id
-                Log.d("MainScreen", "Current Hewan ID: $currentHewanId")
+                currentRentalId = id
+                Log.d("MainScreen", "Current Rental ID: $currentRentalId")
             },
             isUserLoggedIn = user.email.isNotEmpty()
         )
@@ -175,12 +253,12 @@ fun MainScreen() {
                 showDialog = false
             }
         }
-        if (showHewanDialog) {
-            HewanDialog(
+        if (showRentalDialog) {
+            RentalDialog(
                 bitmap = bitmap,
-                onDismissRequest = { showHewanDialog = false }) { nama, namaLatin ->
-                viewModel.saveData(user.email, nama, namaLatin, bitmap!!)
-                showHewanDialog = false
+                onDismissRequest = { showRentalDialog = false }) { name, vehicle, gender ->
+                viewModel.saveData(user.email, name, vehicle, gender, bitmap!!)
+                showRentalDialog = false
             }
         }
 
@@ -193,8 +271,8 @@ fun MainScreen() {
             DeleteConfirmationDialog(
                 onDismissRequest = { showDeleteDialog = false },
                 onConfirm = {
-                    Log.d("MainScreen", "Deleting Hewan ID: $currentHewanId")
-                    viewModel.deleteData(user.email, currentHewanId)
+                    Log.d("MainScreen", "Deleting Rental ID: $currentRentalId")
+                    viewModel.deleteData(user.email, currentRentalId)
                     showDeleteDialog = false
                 }
             )
@@ -204,6 +282,7 @@ fun MainScreen() {
 
 @Composable
 fun ScreenContent(
+    showList: Boolean,
     viewModel: MainViewModel,
     userId: String,
     modifier: Modifier,
@@ -228,19 +307,38 @@ fun ScreenContent(
         }
 
         ApiStatus.SUCCESS -> {
-            LazyVerticalGrid(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(4.dp),
-                columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                items(data) { hewan ->
-                    ListItem(
-                        hewan = hewan,
-                        onDeleteRequest = onDeleteRequest,
-                        isUserLoggedIn = isUserLoggedIn
-                    )
+            if (showList) {
+                LazyVerticalGrid(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .padding(4.dp),
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    items(data.filter { it.auth.isEmpty() || it.auth == userId }) { rental ->
+                        ListItem(
+                            rental = rental,
+                            onDeleteRequest = onDeleteRequest,
+                            isUserLoggedIn = isUserLoggedIn,
+                            currentUserId = userId
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .padding(4.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    items(data.filter { it.auth.isEmpty() || it.auth == userId }) { rental ->
+                        ListItem(
+                            rental = rental,
+                            onDeleteRequest = onDeleteRequest,
+                            isUserLoggedIn = isUserLoggedIn,
+                            currentUserId = userId
+                        )
+                    }
                 }
             }
         }
@@ -264,68 +362,89 @@ fun ScreenContent(
     }
 }
 
+
+
 @Composable
-fun ListItem(hewan: Hewan, onDeleteRequest: (String) -> Unit, isUserLoggedIn: Boolean) {
-    Box(
-        modifier = Modifier
-            .padding(4.dp)
-            .border(1.dp, Color.Gray),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(HewanApi.getHewanUrl(hewan.imageId))
-                .crossfade(true)
-                .build(),
-            contentDescription = stringResource(R.string.gambar, hewan.nama),
-            contentScale = ContentScale.Crop,
-            placeholder = painterResource(id = R.drawable.loading_img),
-            error = painterResource(id = R.drawable.broken_image),
+fun ListItem(
+    rental: Rental,
+    onDeleteRequest: (String) -> Unit,
+    isUserLoggedIn: Boolean,
+    currentUserId: String
+) {
+    if (rental.auth.isEmpty() || rental.auth == currentUserId) {
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(4.dp)
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(4.dp)
-                .background(Color(red = 0f, green = 0f, blue = 0f, alpha = 0.5f))
-                .padding(4.dp)
+                .border(1.dp, Color.Gray),
+            contentAlignment = Alignment.BottomCenter
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = hewan.nama,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Text(
-                    text = hewan.namaLatin,
-                    fontStyle = FontStyle.Italic,
-                    fontSize = 14.sp,
-                    color = Color.White
+            Box(
+                modifier = Modifier
+                    .aspectRatio(1f)
+                    .border(1.dp, Color.Gray)
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(RentalApi.getRentalUrl(rental.image))
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = stringResource(R.string.gambar, rental.vehicle, rental.gender),
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(id = R.drawable.loading_img),
+                    error = painterResource(id = R.drawable.broken_image),
+                    modifier = Modifier.fillMaxSize()
                 )
             }
-            if (isUserLoggedIn && hewan.mine == 1) {
-                IconButton(
-                    onClick = {
-                        if (hewan.id.isNotEmpty()) {
-                            onDeleteRequest(hewan.id)
-                        } else {
-                            Log.d("ListItem", "Invalid hewan ID")
-                        }
-                    },
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.hapus),
-                        tint = Color.White
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp)
+                    .background(Color(red = 0f, green = 0f, blue = 0f, alpha = 0.5f))
+                    .padding(4.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = rental.name,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
+                    Text(
+                        text = rental.vehicle,
+                        fontStyle = FontStyle.Italic,
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                    Text(
+                        text = rental.gender,
+                        fontStyle = FontStyle.Italic,
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                }
+                if (isUserLoggedIn && rental.auth == currentUserId) {
+                    IconButton(
+                        onClick = {
+                            if (rental.id.isNotEmpty()) {
+                                onDeleteRequest(rental.id)
+                            } else {
+                                Log.d("ListItem", "Invalid rental ID")
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.CenterVertically)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.hapus),
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
     }
 }
+
 
 private suspend fun signIn(context: Context, dataStore: UserDataStore) {
     val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
@@ -403,6 +522,6 @@ private fun getCroppedImage(
 @Composable
 fun ScreenPreview() {
     Mobpro1Theme {
-        MainScreen()
+        MainScreen(rememberNavController())
     }
 }
